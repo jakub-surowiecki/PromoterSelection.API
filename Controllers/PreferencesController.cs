@@ -76,6 +76,6 @@ public class PreferencesController : ControllerBase
             .OrderBy(p => p.Priority)
             .ToListAsync();
 
-        return Ok(result);
+        return Ok(prefs);
     }
 }
