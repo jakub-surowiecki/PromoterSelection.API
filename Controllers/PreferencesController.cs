@@ -62,6 +62,7 @@ public class PreferencesController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> GetMyPreferences()
     {
+        // 1. Najpierw pobieramy dane z bazy (tylko to, co EF Core umie przetłumaczyć na SQL)
         var prefs = await _db.Preferences
             .Include(p => p.Supervisor)
             .Where(p => p.StudentId == CurrentUserId)
@@ -75,6 +76,6 @@ public class PreferencesController : ControllerBase
             .OrderBy(p => p.Priority)
             .ToListAsync();
 
-        return Ok(prefs);
+        return Ok(result);
     }
 }

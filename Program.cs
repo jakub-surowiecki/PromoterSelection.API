@@ -16,6 +16,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<ISupervisorService, SupervisorService>();
+builder.Services.AddScoped<IReportService, ReportService>(); 
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // 3. Konfiguracja Autoryzacji JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -71,7 +73,6 @@ using (var scope = app.Services.CreateScope())
 
 app.UseSwagger();
 app.UseSwaggerUI();
-
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
