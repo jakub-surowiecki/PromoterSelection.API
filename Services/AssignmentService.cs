@@ -20,51 +20,54 @@ public class AssignmentService : IAssignmentService
 
     public async Task<(int assigned, int unassigned)> RunAutoAssignment()
     {
-        // Remove existing assignments
-        _db.Assignments.RemoveRange(_db.Assignments);
+        // 1. Bezpieczne usunięcie starych przypisań
+        var existingAssignments = await _db.Assignments.ToListAsync();
+        _db.Assignments.RemoveRange(existingAssignments);
+
+        // Zresetowanie powiązań zespołów
+        var allTeams = await _db.Teams.ToListAsync();
+        foreach (var t in allTeams) t.AssignedSupervisorId = null;
+
         await _db.SaveChangesAsync();
 
+        // 2. Pobranie promotorów i śledzenie ich wolnych miejsc
         var supervisors = await _db.Users
             .Where(u => u.Role == UserRole.Supervisor)
             .ToListAsync();
 
-        // Track remaining capacity per supervisor
         var capacity = supervisors.ToDictionary(s => s.Id, s => s.MaxStudents ?? 0);
 
-        // Get all students sorted by GPA descending (higher GPA = higher priority)
+        // 3. Pobranie wszystkich studentów z ich preferencjami (posortowani po ocenach)
         var students = await _db.Users
             .Where(u => u.Role == UserRole.Student)
             .Include(u => u.Preferences)
-            .Include(u => u.Team)
             .OrderByDescending(u => u.GPA ?? 0)
             .ToListAsync();
 
-        // Identify teams and their leaders (highest GPA in team)
+        // 4. Identyfikacja zespołów
         var teams = await _db.Teams
             .Include(t => t.Members)
             .ToListAsync();
 
         var assignedStudentIds = new HashSet<int>();
         int assignedCount = 0;
+        int unassignedCount = 0;
 
-        // Process team leaders first (they choose for whole team)
+        // --- ETAP 1: Przetwarzanie zespołów ---
         foreach (var team in teams)
         {
             if (!team.Members.Any()) continue;
 
-            // Leader = member with highest GPA
             var leader = team.Members.OrderByDescending(m => m.GPA ?? 0).First();
-
-            // Get leader's preferences
-            var leaderPrefs = await _db.Preferences
-                .Where(p => p.StudentId == leader.Id)
-                .OrderBy(p => p.Priority)
-                .ToListAsync();
+            var leaderStudent = students.FirstOrDefault(s => s.Id == leader.Id);
+            var leaderPrefs = leaderStudent?.Preferences.OrderBy(p => p.Priority).ToList() ?? new List<Preference>();
 
             int? assignedSupervisorId = null;
+            int teamSize = team.Members.Count;
+
+            // Przejście przez wybory
             foreach (var pref in leaderPrefs)
             {
-                int teamSize = team.Members.Count;
                 if (capacity.TryGetValue(pref.SupervisorId, out int cap) && cap >= teamSize)
                 {
                     assignedSupervisorId = pref.SupervisorId;
@@ -75,7 +78,7 @@ public class AssignmentService : IAssignmentService
 
             if (assignedSupervisorId.HasValue)
             {
-                // Assign all team members
+                // Zespół dostał promotora z preferencji
                 foreach (var member in team.Members)
                 {
                     _db.Assignments.Add(new Assignment
@@ -90,14 +93,39 @@ public class AssignmentService : IAssignmentService
                 }
                 team.AssignedSupervisorId = assignedSupervisorId;
             }
+            else
+            {
+                // FALLBACK DLA ZESPOŁU: Szukamy jakiegokolwiek promotora, który zmieści całą grupę
+                var fallback = capacity.FirstOrDefault(kvp => kvp.Value >= teamSize);
+                if (fallback.Key != 0)
+                {
+                    foreach (var member in team.Members)
+                    {
+                        _db.Assignments.Add(new Assignment
+                        {
+                            StudentId = member.Id,
+                            SupervisorId = fallback.Key,
+                            AssignedAt = DateTime.UtcNow,
+                            IsTeamAssignment = true
+                        });
+                        assignedStudentIds.Add(member.Id);
+                        assignedCount++;
+                    }
+                    team.AssignedSupervisorId = fallback.Key;
+                    capacity[fallback.Key] -= teamSize;
+                }
+                else
+                {
+                    // Całkowity brak miejsc na uczelni dla tej drużyny!
+                    unassignedCount += teamSize;
+                }
+            }
         }
 
-        // Process individual students (not in teams), sorted by GPA desc
+        // --- ETAP 2: Przetwarzanie studentów bez zespołu ---
         var individualStudents = students
-            .Where(s => !s.TeamId.HasValue && !assignedStudentIds.Contains(s.Id))
+            .Where(s => s.TeamId == null && !assignedStudentIds.Contains(s.Id))
             .ToList();
-
-        int unassignedCount = 0;
 
         foreach (var student in individualStudents)
         {
@@ -124,7 +152,7 @@ public class AssignmentService : IAssignmentService
 
             if (!wasAssigned)
             {
-                // Try any supervisor with available slot
+                // FALLBACK DLA STUDENTA
                 var fallback = capacity.FirstOrDefault(kvp => kvp.Value > 0);
                 if (fallback.Key != 0)
                 {
