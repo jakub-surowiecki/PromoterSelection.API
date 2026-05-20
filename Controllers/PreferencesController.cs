@@ -25,19 +25,6 @@ public class PreferencesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> SetPreferences([FromBody] SetPreferencesRequest req)
     {
-        // 1. Sprawdzenie harmonogramu
-        var schedule = await _db.Schedules.FirstOrDefaultAsync(s => s.IsActive);
-        if (schedule == null)
-            return BadRequest(new { message = "Brak aktywnego harmonogramu. Zapisy są zamknięte." });
-
-        var now = DateTime.UtcNow;
-        if (now < schedule.StartDate || now > schedule.EndDate)
-            return BadRequest(new { message = "Zapisy nie są w tym momencie otwarte." });
-
-        // 2. Walidacja: czy student wybiera dokładnie 3 promotorów (zgodnie z wymaganiami)
-        if (req.Preferences.Count != 3)
-            return BadRequest(new { message = "Musisz wybrać dokładnie 3 preferowanych promotorów." });
-
         // Usunięcie starych preferencji studenta
         var existing = await _db.Preferences.Where(p => p.StudentId == CurrentUserId).ToListAsync();
         _db.Preferences.RemoveRange(existing);
@@ -60,23 +47,19 @@ public class PreferencesController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> GetMyPreferences()
     {
-        // 1. Najpierw pobieramy dane z bazy (tylko to, co EF Core umie przetłumaczyć na SQL)
         var prefs = await _db.Preferences
             .Include(p => p.Supervisor)
             .Where(p => p.StudentId == CurrentUserId)
+            .Select(p => new PreferenceDto(
+                p.Id,
+                p.SupervisorId,
+                $"{p.Supervisor.FirstName} {p.Supervisor.LastName}",
+                p.Supervisor.Title ?? "",
+                p.Priority,
+                p.Supervisor.MaxStudents ?? 0)) // Należałoby odjąć przypisanych studentów do AvailableSlots
             .OrderBy(p => p.Priority)
-            .ToListAsync(); // <-- Tutaj uderzamy do bazy
+            .ToListAsync();
 
-        // 2. Mapujemy na DTO już w pamięci C# (Client-side evaluation)
-        var result = prefs.Select(p => new PreferenceDto(
-            p.Id,
-            p.SupervisorId,
-            $"{p.Supervisor.FirstName} {p.Supervisor.LastName}".Trim(),
-            p.Supervisor.Title ?? "",
-            p.Priority,
-            p.Supervisor.MaxStudents ?? 0
-        )).ToList();
-
-        return Ok(result);
+        return Ok(prefs);
     }
 }
