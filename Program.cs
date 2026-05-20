@@ -15,6 +15,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // 2. Rejestracja Twoich Serwisów
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
+builder.Services.AddScoped<ISupervisorService, SupervisorService>();
 
 // 3. Konfiguracja Autoryzacji JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");

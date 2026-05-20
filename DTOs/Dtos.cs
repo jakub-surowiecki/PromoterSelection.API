@@ -68,3 +68,6 @@ public record CsvStudentRow
 public record ReportStudentRow(string AlbumNumber, string StudentName, string SupervisorName, string SupervisorTitle);
 public record ReportTeamRow(string TeamName, string LeaderName, string SupervisorName, List<string> Members);
 public record ReportUnusedSlotRow(string SupervisorName, int TotalSlots, int UsedSlots, int UnusedSlots);
+
+// Supervisor
+public record ProcessDescriptionDto(string Description);
