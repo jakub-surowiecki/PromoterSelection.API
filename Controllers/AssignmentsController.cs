@@ -14,24 +14,54 @@ public class AssignmentsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IAssignmentService _assignmentService;
+    private readonly IEmailService _emailService;
 
-    public AssignmentsController(AppDbContext db, IAssignmentService assignmentService)
+    public AssignmentsController(AppDbContext db, IAssignmentService assignmentService, IEmailService emailService)
     {
         _db = db;
         _assignmentService = assignmentService;
+        _emailService = emailService;
     }
 
     [HttpPost("run")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RunAlgorithm()
     {
-        // Wywołujemy prawdziwy algorytm z Twojego serwisu
+        // 1. Uruchomienie algorytmu
         var (assigned, unassigned) = await _assignmentService.RunAutoAssignment();
 
-        // Zwracamy pełne statystyki
+        // 2. Pobranie wyników przydziału wraz z danymi studentów, promotorów i zespołów
+        var assignments = await _db.Assignments
+            .Include(a => a.Student)
+                .ThenInclude(s => s.Team)
+            .Include(a => a.Supervisor)
+            .ToListAsync();
+
+        // 3. Wysyłka e-maili do każdego przydzielonego studenta
+        foreach (var assignment in assignments)
+        {
+            var studentEmail = assignment.Student.Email;
+            var supervisorName = $"{assignment.Supervisor.Title} {assignment.Supervisor.FirstName} {assignment.Supervisor.LastName}".Trim();
+
+            var subject = "Wyniki przydziału promotora";
+            var body = $"Witaj {assignment.Student.FirstName},\n\n" +
+                       $"Proces wyborów dobiegł końca. Twój przydzielony promotor to:\n" +
+                       $"Pan/Pani {supervisorName}.\n\n";
+
+            // Dodatkowa informacja, jeśli student był w zespole
+            if (assignment.IsTeamAssignment && assignment.Student.Team != null)
+            {
+                body += $"Przydział został dokonany w ramach Twojego zespołu: {assignment.Student.Team.Name}.\n\n";
+            }
+
+            body += "Pozdrawiamy,\nSystem Wyboru Promotorów";
+
+            await _emailService.SendEmailAsync(studentEmail, subject, body);
+        }
+
         return Ok(new
         {
-            message = "Algorytm przydziału został zakończony pomyślnie.",
+            message = "Algorytm przydziału został zakończony pomyślnie. Powiadomienia e-mail zostały rozesłane.",
             assignedCount = assigned,
             unassignedCount = unassigned
         });
@@ -40,14 +70,11 @@ public class AssignmentsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAssignments()
     {
-        // Najpierw pobieramy dane do pamięci za pomocą ToListAsync()
-        // Zapobiega to błędowi z łączeniem stringów (imienia i nazwiska) przez bazę danych
         var assignments = await _db.Assignments
             .Include(a => a.Student)
             .Include(a => a.Supervisor)
             .ToListAsync();
 
-        // Następnie bezpiecznie mapujemy je na DTO
         var result = assignments.Select(a => new AssignmentDto(
             a.Id,
             a.StudentId,
