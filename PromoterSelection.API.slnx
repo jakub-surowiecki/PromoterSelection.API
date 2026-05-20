@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Elementy rozwiązania/">
+    <File Path=".gitignore" />
+  </Folder>
+  <Project Path="PromoterSelection.API.csproj" />
+</Solution>

@@ -1,0 +1,6 @@
+@PromoterSelection.API_HostAddress = http://localhost:5178
+
+GET {{PromoterSelection.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
