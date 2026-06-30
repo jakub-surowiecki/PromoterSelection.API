@@ -15,7 +15,8 @@ public record UpdateUserRequest(
     string? FirstName, string? LastName,
     string? Email, string? Password,
     double? GPA, bool? IsGPAConfirmed,
-    string? Title, int? MaxStudents);
+    string? Title, int? MaxStudents,
+    string? AlbumNumber);
 
 public record UserDto(
     int Id, string Email, string Role, string FirstName, string LastName,
@@ -62,6 +63,7 @@ public record CsvStudentRow
     public string LastName { get; set; } = "";
     public string Email { get; set; } = "";
     public double GPA { get; set; }
+    public string Password { get; set; } = "";
 }
 
 // Reports

@@ -125,6 +125,7 @@ public class UsersController : ControllerBase
         if (req.FirstName != null) user.FirstName = req.FirstName;
         if (req.LastName != null) user.LastName = req.LastName;
         if (req.Email != null) user.Email = req.Email;
+        if (req.AlbumNumber != null) user.AlbumNumber = req.AlbumNumber;
         if (req.Password != null) user.PasswordHash = _auth.HashPassword(req.Password);
         if (req.GPA.HasValue) user.GPA = req.GPA;
         if (req.IsGPAConfirmed.HasValue) user.IsGPAConfirmed = req.IsGPAConfirmed.Value;
@@ -179,7 +180,7 @@ public class UsersController : ControllerBase
             _db.Users.Add(new User
             {
                 Email = row.Email,
-                PasswordHash = _auth.HashPassword("zmienhaslo123"),
+                PasswordHash = _auth.HashPassword(!string.IsNullOrWhiteSpace(row.Password) ? row.Password : "student123"),
                 Role = UserRole.Student,
                 FirstName = row.FirstName,
                 LastName = row.LastName,

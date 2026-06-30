@@ -1,11 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StudentDashboard from './components/StudentDashboard';
 import SupervisorDashboard from './components/SupervisorDashboard';
 import AdminDashboard from './components/AdminDashboard';
-import { User, GraduationCap, Settings, Sparkles } from 'lucide-react';
+import LoginView from './components/LoginView';
+import { LogOut, Sparkles, UserCircle } from 'lucide-react';
 
 export default function App() {
-    const [role, setRole] = useState('student');
+    const [role, setRole] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [fullName, setFullName] = useState('');
+
+    useEffect(() => {
+        // Sprawdzamy, czy użytkownik jest już zalogowany w pamięci przeglądarki
+        const token = localStorage.getItem('token');
+        const savedRole = localStorage.getItem('role');
+        const savedName = localStorage.getItem('fullName');
+
+        if (token && savedRole) {
+            setIsAuthenticated(true);
+            setRole(savedRole);
+            setFullName(savedName || 'Użytkownik');
+        }
+    }, []);
+
+    const handleLogin = (userRole) => {
+        setIsAuthenticated(true);
+        setRole(userRole);
+        setFullName(localStorage.getItem('fullName'));
+    };
+
+    const handleLogout = () => {
+        localStorage.clear();
+        setIsAuthenticated(false);
+        setRole(null);
+    };
+
+    if (!isAuthenticated) {
+        return <LoginView onLogin={handleLogin} />;
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -21,24 +53,18 @@ export default function App() {
                         </div>
                     </div>
 
-                    <div className="flex items-center p-1.5 bg-slate-100/80 rounded-2xl ring-1 ring-slate-200/50">
-                        {[
-                            { id: 'student', icon: User, label: 'Student' },
-                            { id: 'supervisor', icon: GraduationCap, label: 'Promotor' },
-                            { id: 'admin', icon: Settings, label: 'Administrator' }
-                        ].map((r) => (
-                            <button
-                                key={r.id}
-                                onClick={() => setRole(r.id)}
-                                className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center space-x-2 ${role === r.id
-                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/50 scale-100'
-                                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 scale-95'
-                                    }`}
-                            >
-                                <r.icon className={`w-4 h-4 ${role === r.id ? 'text-indigo-600' : 'text-slate-400'}`} />
-                                <span>{r.label}</span>
-                            </button>
-                        ))}
+                    <div className="flex items-center space-x-4 p-1.5">
+                        <div className="flex items-center space-x-2 text-sm font-semibold text-slate-700 bg-slate-100 px-4 py-2 rounded-xl ring-1 ring-slate-200">
+                            <UserCircle className="w-5 h-5 text-indigo-500" />
+                            <span>{fullName}</span>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="px-4 py-2 text-sm font-bold bg-rose-50 text-rose-600 rounded-xl ring-1 ring-rose-200 hover:bg-rose-100 transition-colors flex items-center space-x-2"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            <span>Wyloguj</span>
+                        </button>
                     </div>
                 </div>
             </header>

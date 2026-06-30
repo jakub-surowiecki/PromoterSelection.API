@@ -61,4 +61,27 @@ public class SchedulesController : ControllerBase
 
         return Ok(new { id = newSchedule.Id });
     }
+
+    [HttpDelete("reset")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ResetSystem()
+    {
+        // 1. Usuwamy harmonogramy
+        var schedules = await _db.Schedules.ToListAsync();
+        _db.Schedules.RemoveRange(schedules);
+
+        // 2. Usuwamy przydziały (wyniki algorytmu)
+        var assignments = await _db.Assignments.ToListAsync();
+        _db.Assignments.RemoveRange(assignments);
+
+        // 3. Resetujemy powiązania zespołów z promotorami
+        var teams = await _db.Teams.ToListAsync();
+        foreach (var t in teams)
+        {
+            t.AssignedSupervisorId = null;
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "System został zresetowany." });
+    }
 }

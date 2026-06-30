@@ -21,6 +21,7 @@ public class TopicsController : ControllerBase
     }
 
     private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private string CurrentRole => User.FindFirstValue(ClaimTypes.Role)!;
 
     [HttpPost]
     [Authorize(Roles = "Supervisor")]
@@ -61,5 +62,40 @@ public class TopicsController : ControllerBase
         )).ToList();
 
         return Ok(result);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<IActionResult> UpdateTopic(int id, [FromBody] CreateTopicRequest req)
+    {
+        var topic = await _db.ThesisTopics.FindAsync(id);
+        if (topic == null) return NotFound();
+
+        // Tylko Admin lub właściciel tematu może go edytować
+        if (CurrentRole != "Admin" && topic.SupervisorId != CurrentUserId)
+            return Forbid();
+
+        topic.Title = req.Title;
+        topic.Description = req.Description;
+        await _db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<IActionResult> DeleteTopic(int id)
+    {
+        var topic = await _db.ThesisTopics.FindAsync(id);
+        if (topic == null) return NotFound();
+
+        // Tylko Admin lub właściciel tematu może go usunąć
+        if (CurrentRole != "Admin" && topic.SupervisorId != CurrentUserId)
+            return Forbid();
+
+        _db.ThesisTopics.Remove(topic);
+        await _db.SaveChangesAsync();
+
+        return NoContent();
     }
 }

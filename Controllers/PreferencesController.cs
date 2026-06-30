@@ -62,19 +62,20 @@ public class PreferencesController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> GetMyPreferences()
     {
-        // 1. Najpierw pobieramy dane z bazy (tylko to, co EF Core umie przetłumaczyć na SQL)
-        var prefs = await _db.Preferences
+        var dbPreferences = await _db.Preferences
             .Include(p => p.Supervisor)
             .Where(p => p.StudentId == CurrentUserId)
-            .Select(p => new PreferenceDto(
-                p.Id,
-                p.SupervisorId,
-                $"{p.Supervisor.FirstName} {p.Supervisor.LastName}".Trim(),
-                p.Supervisor.Title ?? string.Empty,
-                p.Priority,
-                p.Supervisor.MaxStudents ?? 0))
             .OrderBy(p => p.Priority)
             .ToListAsync();
+
+        var prefs = dbPreferences.Select(p => new PreferenceDto(
+            p.Id,
+            p.SupervisorId,
+            $"{p.Supervisor.FirstName} {p.Supervisor.LastName}".Trim(),
+            p.Supervisor.Title ?? string.Empty,
+            p.Priority,
+            p.Supervisor.MaxStudents ?? 0))
+        .ToList();
 
         return Ok(prefs);
     }

@@ -104,4 +104,39 @@ public class TeamsController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateTeam(int id, [FromBody] CreateTeamRequest req)
+    {
+        var team = await _db.Teams.FindAsync(id);
+        if (team == null) return NotFound();
+        team.Name = req.Name;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteTeam(int id)
+    {
+        var team = await _db.Teams.Include(t => t.Members).FirstOrDefaultAsync(t => t.Id == id);
+        if (team == null) return NotFound();
+        // Usuwamy przypisanie studentów do tego zespołu
+        foreach (var m in team.Members) m.TeamId = null;
+        _db.Teams.Remove(team);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("{teamId}/members/{studentId}")]
+    [Authorize(Roles = "Admin,Student")]
+    public async Task<IActionResult> RemoveMember(int teamId, int studentId)
+    {
+        var student = await _db.Users.FirstOrDefaultAsync(u => u.Id == studentId && u.TeamId == teamId);
+        if (student == null) return NotFound();
+        student.TeamId = null;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
 }
